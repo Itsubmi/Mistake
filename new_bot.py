@@ -96,7 +96,7 @@ BTN_REPLY = "✍️ Ответить"
 BTN_REQUEST_CONTACT = "🔗 Запросить контакт"
 ASK_REPLY_TEXT = "Напиши ответ:"
 
-CONTACT_REQUEST_TEXT = "Пользователь #{sender_id} хочет получить ваш контакт. Передать?"
+CONTACT_REQUEST_TEXT = "Пользователь #{sender_name} хочет получить ваш контакт. Передать?"
 BTN_CONTACT_YES = "✅ Да"
 BTN_CONTACT_NO = "🚫 Нет"
 CONTACT_SENT_TO_REQUESTER = "Вам передали контакт: @{username}"
@@ -689,7 +689,7 @@ def reply_send(update: Update, context: CallbackContext) -> int:
         if not is_introduced(sender_id, target_id):
             send_profile_card(context, target_id, sender_row, keyboard=None)
             mark_introduced(sender_id, target_id)
-            
+
         context.bot.send_message(
             chat_id=target_id,
             text=f"💬 Ответ от «{sender_name}»:\n\n{text}",
