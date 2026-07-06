@@ -9,7 +9,8 @@ Telegram-бот: проверка подписки -> анкетирование
 ВСЕ ТЕКСТЫ С ПОМЕТКОЙ "ЗАГЛУШКА" — замените на свои формулировки.
 Раздел НАСТРОЙКИ ниже — впишите токен бота и список каналов для проверки подписки.
 """
-
+import time
+import random
 import logging
 import re
 import sqlite3
@@ -47,7 +48,7 @@ DB_PATH = "bot.db"
 # Публичный канал: "@username_канала"
 # Приватный канал: числовой chat_id вида -100xxxxxxxxxx (бот должен быть админом канала)
 CHANNELS = [
-    "@vashcreator"
+    "@prog_lina_cases"
 ]
 
 # ============================================================================
@@ -68,10 +69,10 @@ TEXT_5 = "Важно: брать деньги за штурм нельзя. Вм
 TEXT_6 = "Но, сперва, давай заполним анкету, чтобы лучше узнать твою креативную голову."                     # ЗАГЛУШКА
 BUTTON_6 = "Заполнить анкету"
 
-ASK_NAME = "Твоё имя:"                                              # ввод имени
-ASK_WORK = "Кто ты?\n(Креатор, копирайтер, дизайнер, арт, менеджер и т.д.)"                                                    # ЗАГЛУШКА: например «Укажите вашу специализацию»
-ASK_DESCRIPTION = "Опыт в креативе\n(В одно предложение расскажи о том, что ты делал.)"                                    # ЗАГЛУШКА: например «Расскажите о себе подробно»
-ASK_PORTFOLIO = "Ссылка на портфолио\n(или напиши «нет»):"
+ASK_NAME = "<b>Твоё имя:</b>"                                              # ввод имени
+ASK_WORK = "<b>Кто ты?</b>\n(Креатор, копирайтер, дизайнер, арт, менеджер и т.д.)"                                                    # ЗАГЛУШКА: например «Укажите вашу специализацию»
+ASK_DESCRIPTION = "<b>Опыт в креативе</b>\n(В одно предложение расскажи о том, что ты делал.)"                                    # ЗАГЛУШКА: например «Расскажите о себе подробно»
+ASK_PORTFOLIO = "<b>Ссылка на портфолио</b>\n(или напиши «нет»):"
 
 TEXT_7 = "Проверяем анкету."                     # ЗАГЛУШКА: после завершения анкеты
 TEXT_8 = "Анкета проверена и добавлена в общую библиотеку."                     # ЗАГЛУШКА
@@ -83,13 +84,13 @@ BTN_STATUS = "Статус"
 BTN_MYPROFILE = "Моя карточка"
 BTN_BACK_MENU = "В меню"
 
-NO_MORE_PROFILES = "Анкет больше нет."
+NO_MORE_PROFILES = "<b>Анкет больше нет.</b>"
 BTN_CHAT = "💬 Штурмить"
 BTN_NEXT = "➡️ Дальше"
 BTN_PREV = "⬅️ Назад"
 
-ASK_MESSAGE_TEXT = "Напишите сообщение, которое хотите отправить:"
-MESSAGE_SENT_OK = "✅ Сообщение отправлено."
+ASK_MESSAGE_TEXT = "Напиши что хотел бы отправить:"
+MESSAGE_SENT_OK = "✅ Отправлено"
 BTN_REPLY = "✍️ Ответить"
 BTN_REQUEST_CONTACT = "🔗 Запросить контакт"
 ASK_REPLY_TEXT = "Напиши ответ:"
@@ -120,7 +121,7 @@ ASK_NEW_DESCRIPTION = "Начирикай о себе в чат:"
 ASK_NEW_PORTFOLIO = "Пришли новую ссылку на портфолио:"
 UPDATED_OK = "Готово!"
 
-CANCEL_TEXT = "Действие отменено."
+CANCEL_TEXT = "Отмена"
 NOT_REGISTERED_TEXT = "Сначала нужно пройти регистрацию. Используйте /start"
 
 # ============================================================================
@@ -269,17 +270,19 @@ def main_menu_keyboard():
     ]
     return InlineKeyboardMarkup(keyboard)
 
+def cmd_menu(update: Update, context: CallbackContext) -> None:
+    send_main_menu(context, update.message.chat_id)
 
 def send_main_menu(context: CallbackContext, chat_id: int):
-    context.bot.send_message(chat_id=chat_id, text=MAIN_MENU_TEXT, reply_markup=main_menu_keyboard())
+    context.bot.send_message(chat_id=chat_id, text=MAIN_MENU_TEXT, reply_markup=main_menu_keyboard(), parse_mode="HTML")
 
 
 def format_profile_text(user_row) -> str:
     portfolio = user_row["portfolio_link"] or "не указано"
     return (
-        f"👤 Имя: {user_row['name']}\n"
+        f"👤 {user_row['name']}\n"
         f"💼 {user_row['work'] or '—'}\n"
-        f"📋 О себе: {user_row['description'] or '—'}\n"
+        f"📋 {user_row['description'] or '—'}\n"
         f"🔗 Портфолио: {portfolio}\n"
     )
 
@@ -293,7 +296,7 @@ def send_profile_card(context: CallbackContext, chat_id: int, user_row, keyboard
             return
         except Exception as e:
             logger.error(f"Не удалось отправить фото профиля: {e}")
-    context.bot.send_message(chat_id=chat_id, text=text, reply_markup=keyboard)
+    context.bot.send_message(chat_id=chat_id, text=text, reply_markup=keyboard, parse_mode="HTML")
 
 
 # ============================================================================
@@ -339,12 +342,15 @@ def check_sub_callback(update: Update, context: CallbackContext) -> int:
     except Exception:
         pass
 
-    context.bot.send_message(chat_id=chat_id, text=TEXT_3)
-    context.bot.send_message(chat_id=chat_id, text=TEXT_4)
-    context.bot.send_message(chat_id=chat_id, text=TEXT_5)
+    context.bot.send_message(chat_id=chat_id, text=TEXT_3, parse_mode="HTML")
+    time.sleep(random.uniform(0.5, 1.1))
+    context.bot.send_message(chat_id=chat_id, text=TEXT_4, parse_mode="HTML")
+    time.sleep(random.uniform(0.5, 1.1))
+    context.bot.send_message(chat_id=chat_id, text=TEXT_5, parse_mode="HTML")
+    time.sleep(random.uniform(0.5, 1.1))
 
     keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_6, callback_data="continue_reg")]])
-    context.bot.send_message(chat_id=chat_id, text=TEXT_6, reply_markup=keyboard)
+    context.bot.send_message(chat_id=chat_id, text=TEXT_6, reply_markup=keyboard, parse_mode="HTML")
     return REG_WAIT_CONTINUE
 
 
@@ -387,10 +393,13 @@ def reg_portfolio(update: Update, context: CallbackContext) -> int:
     update_field(telegram_id, "portfolio_link", link_value)
 
     chat_id = update.message.chat_id
-    context.bot.send_message(chat_id=chat_id, text=TEXT_7)
-    context.bot.send_message(chat_id=chat_id, text=TEXT_8)
-    context.bot.send_message(chat_id=chat_id, text=TEXT_9)
+    context.bot.send_message(chat_id=chat_id, text=TEXT_7, parse_mode="HTML")
+    time.sleep(random.uniform(0.5, 1.1))
+    context.bot.send_message(chat_id=chat_id, text=TEXT_8, parse_mode="HTML")
+    time.sleep(random.uniform(0.5, 1.1))
+    context.bot.send_message(chat_id=chat_id, text=TEXT_9, parse_mode="HTML")
     send_main_menu(context, chat_id)
+    append_to_sheet(get_user(telegram_id))
     return ConversationHandler.END
 
 
@@ -515,7 +524,7 @@ def show_library_profile(context: CallbackContext, chat_id: int, user_data: dict
 
     if not queue or index < 0 or index >= len(queue):
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(BTN_BACK_MENU, callback_data="back_to_menu")]])
-        context.bot.send_message(chat_id=chat_id, text=NO_MORE_PROFILES, reply_markup=keyboard)
+        context.bot.send_message(chat_id=chat_id, text=NO_MORE_PROFILES, reply_markup=keyboard, parse_mode="HTML")
         return
 
     target_id = queue[index]
@@ -553,10 +562,6 @@ def lib_next_callback(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     query.answer()
     context.user_data["library_index"] = context.user_data.get("library_index", 0) + 1
-    try:
-        query.delete_message()
-    except Exception:
-        pass
     show_library_profile(context, query.from_user.id, context.user_data)
 
 
@@ -564,10 +569,6 @@ def lib_prev_callback(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     query.answer()
     context.user_data["library_index"] = max(0, context.user_data.get("library_index", 0) - 1)
-    try:
-        query.delete_message()
-    except Exception:
-        pass
     show_library_profile(context, query.from_user.id, context.user_data)
 
 
@@ -797,6 +798,33 @@ edit_handler = ConversationHandler(
     fallbacks=[CommandHandler("cancel", cancel)],
 )
 
+import gspread
+from google.oauth2.service_account import Credentials
+
+GOOGLE_SHEET_ID = "1AnwNxyLY7tohVMTKkKjs14jFeWyIdh5BiRaIIY4IeBE"  # из URL таблицы
+GOOGLE_CREDS_FILE = "service_account.json"
+
+def get_gsheet():
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    creds = Credentials.from_service_account_file(GOOGLE_CREDS_FILE, scopes=scopes)
+    client = gspread.authorize(creds)
+    return client.open_by_key(GOOGLE_SHEET_ID).sheet1
+
+
+def append_to_sheet(user_row):
+    try:
+        sheet = get_gsheet()
+        sheet.append_row([
+            str(user_row["telegram_id"]),
+            user_row["username"] or "",
+            user_row["name"] or "",
+            user_row["work"] or "",
+            user_row["description"] or "",
+            user_row["portfolio_link"] or "",
+            datetime.utcnow().isoformat(),
+        ])
+    except Exception as e:
+        logger.error(f"Ошибка записи в Google Sheets: {e}")
 
 # ============================================================================
 #                                   MAIN
@@ -823,6 +851,7 @@ def main():
     dispatcher.add_handler(CallbackQueryHandler(menu_myprofile_callback, pattern="^menu_myprofile$"))
     dispatcher.add_handler(CallbackQueryHandler(status_set_callback, pattern="^status_set_[12]$"))
     dispatcher.add_handler(CallbackQueryHandler(back_to_menu_callback, pattern="^back_to_menu$"))
+    dispatcher.add_handler(CommandHandler("menu", cmd_menu), group=1)
 
     # Библиотека: навигация
     dispatcher.add_handler(CallbackQueryHandler(lib_next_callback, pattern="^lib_next$"))
