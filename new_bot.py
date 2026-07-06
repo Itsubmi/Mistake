@@ -343,11 +343,11 @@ def check_sub_callback(update: Update, context: CallbackContext) -> int:
         pass
 
     context.bot.send_message(chat_id=chat_id, text=TEXT_3, parse_mode="HTML")
-    time.sleep(random.uniform(0.5, 1.1))
+    time.sleep(1.3)
     context.bot.send_message(chat_id=chat_id, text=TEXT_4, parse_mode="HTML")
-    time.sleep(random.uniform(0.5, 1.1))
+    time.sleep(1.5)
     context.bot.send_message(chat_id=chat_id, text=TEXT_5, parse_mode="HTML")
-    time.sleep(random.uniform(0.5, 1.1))
+    time.sleep(1.4)
 
     keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_6, callback_data="continue_reg")]])
     context.bot.send_message(chat_id=chat_id, text=TEXT_6, reply_markup=keyboard, parse_mode="HTML")
@@ -361,28 +361,28 @@ def continue_reg_callback(update: Update, context: CallbackContext) -> int:
         query.delete_message()
     except Exception:
         pass
-    context.bot.send_message(chat_id=query.from_user.id, text=ASK_NAME)
+    context.bot.send_message(chat_id=query.from_user.id, text=ASK_NAME, parse_mode="HTML")
     return REG_NAME
 
 
 def reg_name(update: Update, context: CallbackContext) -> int:
     name_value = update.message.text.strip()
     update_field(update.message.from_user.id, "name", name_value)
-    update.message.reply_text(ASK_WORK)
+    update.message.reply_text(ASK_WORK, parse_mode="HTML")
     return REG_WORK
 
 
 def reg_work(update: Update, context: CallbackContext) -> int:
     work_value = update.message.text.strip()
     update_field(update.message.from_user.id, "work", work_value)
-    update.message.reply_text(ASK_DESCRIPTION)
+    update.message.reply_text(ASK_DESCRIPTION, parse_mode="HTML")
     return REG_DESCRIPTION
 
 
 def reg_description(update: Update, context: CallbackContext) -> int:
     description_value = update.message.text.strip()
     update_field(update.message.from_user.id, "description", description_value)
-    update.message.reply_text(ASK_PORTFOLIO)
+    update.message.reply_text(ASK_PORTFOLIO, parse_mode="HTML")
     return REG_PORTFOLIO
 
 
@@ -394,9 +394,9 @@ def reg_portfolio(update: Update, context: CallbackContext) -> int:
 
     chat_id = update.message.chat_id
     context.bot.send_message(chat_id=chat_id, text=TEXT_7, parse_mode="HTML")
-    time.sleep(random.uniform(0.5, 1.1))
+    time.sleep(1)
     context.bot.send_message(chat_id=chat_id, text=TEXT_8, parse_mode="HTML")
-    time.sleep(random.uniform(0.5, 1.1))
+    time.sleep(1.3)
     context.bot.send_message(chat_id=chat_id, text=TEXT_9, parse_mode="HTML")
     send_main_menu(context, chat_id)
     append_to_sheet(get_user(telegram_id))
