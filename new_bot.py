@@ -20,6 +20,7 @@ from telegram import (
     Update,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    BotCommand,
 )
 from telegram.ext import (
     Updater,
@@ -174,6 +175,33 @@ def init_db():
         )
         """
     )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS introductions (
+            user_a INTEGER,
+            user_b INTEGER,
+            PRIMARY KEY (user_a, user_b)
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+def is_introduced(id1, id2) -> bool:
+    a, b = sorted((id1, id2))
+    conn = db_connect()
+    cur = conn.cursor()
+    cur.execute("SELECT 1 FROM introductions WHERE user_a=? AND user_b=?", (a, b))
+    row = cur.fetchone()
+    conn.close()
+    return row is not None
+
+
+def mark_introduced(id1, id2):
+    a, b = sorted((id1, id2))
+    conn = db_connect()
+    cur = conn.cursor()
+    cur.execute("INSERT OR IGNORE INTO introductions (user_a, user_b) VALUES (?, ?)", (a, b))
     conn.commit()
     conn.close()
 
@@ -427,6 +455,16 @@ registration_handler = ConversationHandler(
 #                                  МЕНЮ
 # ============================================================================
 
+HELP_TEXT = (
+    "ℹ️ <b>Доступные команды:</b>\n\n"
+    "/start — начать регистрацию или открыть бота\n"
+    "/menu — открыть главное меню\n"
+    "/help — показать это сообщение"
+)
+
+def cmd_help(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text(HELP_TEXT, parse_mode="HTML")
+
 def menu_myprofile_callback(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     query.answer()
@@ -609,9 +647,13 @@ def lib_chat_send(update: Update, context: CallbackContext) -> int:
     sender_name = sender_row["name"] if sender_row else str(sender_id)
 
     try:
+        if not is_introduced(sender_id, target_id):
+            send_profile_card(context, target_id, sender_row, keyboard=None)
+            mark_introduced(sender_id, target_id)
+
         context.bot.send_message(
             chat_id=target_id,
-            text=f"💌 Новое сообщение от анкеты «{sender_name}» (#{sender_id}):\n\n{text}",
+            text=f"💌 Сообщение от (#{sender_name}):\n\n{text}",
             reply_markup=chat_target_keyboard(sender_id),
         )
         update.message.reply_text(MESSAGE_SENT_OK)
@@ -644,9 +686,13 @@ def reply_send(update: Update, context: CallbackContext) -> int:
     sender_name = sender_row["name"] if sender_row else str(sender_id)
 
     try:
+        if not is_introduced(sender_id, target_id):
+            send_profile_card(context, target_id, sender_row, keyboard=None)
+            mark_introduced(sender_id, target_id)
+            
         context.bot.send_message(
             chat_id=target_id,
-            text=f"💬 Ответ от «{sender_name}» (#{sender_id}):\n\n{text}",
+            text=f"💬 Ответ от «{sender_name}»:\n\n{text}",
             reply_markup=chat_target_keyboard(sender_id),
         )
         update.message.reply_text(MESSAGE_SENT_OK)
@@ -798,33 +844,25 @@ edit_handler = ConversationHandler(
     fallbacks=[CommandHandler("cancel", cancel)],
 )
 
-import gspread
-from google.oauth2.service_account import Credentials
+import requests
 
-GOOGLE_SHEET_ID = "1AnwNxyLY7tohVMTKkKjs14jFeWyIdh5BiRaIIY4IeBE"  # из URL таблицы
-GOOGLE_CREDS_FILE = "service_account.json"
-
-def get_gsheet():
-    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-    creds = Credentials.from_service_account_file(GOOGLE_CREDS_FILE, scopes=scopes)
-    client = gspread.authorize(creds)
-    return client.open_by_key(GOOGLE_SHEET_ID).sheet1
-
+GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwBVTHhszPrjcD04xY8kItb9MIcgx4gYRaJGrtTXa4d_7DG61tRfDmntYRXXNzBHWj0/exec"  # вставь свой URL
 
 def append_to_sheet(user_row):
+    """Отправляет данные анкеты в Google Таблицу через Apps Script Web App."""
+    payload = {
+        "username": user_row["username"] or "",
+        "answer_q1": user_row["name"] or "",
+        "answer_q2": user_row["work"] or "",
+        "answer_q3": user_row["description"] or "",
+        "answer_q4": user_row["portfolio_link"] or "",
+    }
     try:
-        sheet = get_gsheet()
-        sheet.append_row([
-            str(user_row["telegram_id"]),
-            user_row["username"] or "",
-            user_row["name"] or "",
-            user_row["work"] or "",
-            user_row["description"] or "",
-            user_row["portfolio_link"] or "",
-            datetime.utcnow().isoformat(),
-        ])
+        response = requests.post(GOOGLE_SCRIPT_URL, json=payload, timeout=10)
+        if response.status_code != 200:
+            logger.error(f"Google Script вернул статус {response.status_code}: {response.text}")
     except Exception as e:
-        logger.error(f"Ошибка записи в Google Sheets: {e}")
+        logger.error(f"Ошибка отправки данных анкеты в Google Sheets: {e}")
 
 # ============================================================================
 #                                   MAIN
@@ -851,7 +889,8 @@ def main():
     dispatcher.add_handler(CallbackQueryHandler(menu_myprofile_callback, pattern="^menu_myprofile$"))
     dispatcher.add_handler(CallbackQueryHandler(status_set_callback, pattern="^status_set_[12]$"))
     dispatcher.add_handler(CallbackQueryHandler(back_to_menu_callback, pattern="^back_to_menu$"))
-    dispatcher.add_handler(CommandHandler("menu", cmd_menu), group=1)
+    dispatcher.add_handler(CommandHandler("menu", cmd_menu))
+    dispatcher.add_handler(CommandHandler("help", cmd_help))
 
     # Библиотека: навигация
     dispatcher.add_handler(CallbackQueryHandler(lib_next_callback, pattern="^lib_next$"))
@@ -861,6 +900,12 @@ def main():
     dispatcher.add_handler(CallbackQueryHandler(request_contact_callback, pattern=r"^reqcontact_\d+$"))
     dispatcher.add_handler(CallbackQueryHandler(contact_yes_callback, pattern=r"^contact_yes_\d+$"))
     dispatcher.add_handler(CallbackQueryHandler(contact_no_callback, pattern=r"^contact_no_\d+$"))
+
+    updater.bot.set_my_commands([
+        BotCommand("start", "Начать"),
+        BotCommand("menu", "Общее меню"),
+        BotCommand("help", "Помощь"),
+    ])
 
     updater.start_polling()
     logger.info("Бот запущен.")
